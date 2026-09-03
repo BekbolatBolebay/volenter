@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { ArrowRight, Bot, Sparkles, Trophy, Globe, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, Bot, Sparkles, Trophy, Globe, ShieldCheck, Zap, HeartPulse } from "lucide-react";
 import React, { useEffect, useState, useRef } from "react";
 
 export default function Home() {
@@ -35,8 +35,12 @@ export default function Home() {
             <span className="font-black text-xl tracking-tighter text-shimmer">KarmIQ</span>
           </div>
           <div className="flex items-center space-x-4">
+             <Link href="/med-agent" className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-black uppercase tracking-wider hover:bg-rose-500/30 transition-all">
+                <HeartPulse size={14} className="animate-pulse" /> MedAI Триаж & 103
+             </Link>
+             <div className="w-px h-4 bg-white/10 hidden sm:block" />
              <Link href="/login" className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-emerald-400 transition-colors">Volunteer Hub</Link>
-             <div className="w-px h-4 bg-white/10" />
+             <div className="w-px h-4 bg-white/10 hidden sm:block" />
              <Link href="/login" className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-blue-400 transition-colors">Admin Terminal</Link>
           </div>
         </div>
@@ -61,25 +65,33 @@ export default function Home() {
             </h1>
             
             <p className="text-xl md:text-2xl text-slate-400 max-w-2xl mx-auto font-medium mb-12">
-              The world's first AI-native volunteer platform. <br className="hidden md:block" />
-              Real skills. Real impact. Real rewards.
+              The world's first AI-native volunteer & emergency triage platform. <br className="hidden md:block" />
+              Real skills. Real impact. Instant care.
             </p>
           </motion.div>
 
           {/* Call to Action Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl mx-auto mt-10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl mx-auto mt-10 text-left">
              <RoleCard 
                 title="Volunteer" 
                 desc="Level up your career skills, earn premium badges, and exchange XP for exclusive rewards."
-                icon={<Trophy size={48} />}
+                icon={<Trophy size={40} />}
                 color="emerald"
                 href="/login"
                 delay={0.2}
              />
              <RoleCard 
+                title="MedAI & 103" 
+                desc="Симптомдарды талдау, қажетті дәрігерді картадан табу және 103 шұғыл жедел көмек шақыру режимі."
+                icon={<HeartPulse size={40} />}
+                color="rose"
+                href="/med-agent"
+                delay={0.3}
+             />
+             <RoleCard 
                 title="Administrator" 
                 desc="Deploy AI agents for task creation, automated matching, and fraud protection."
-                icon={<Bot size={48} />}
+                icon={<Bot size={40} />}
                 color="blue"
                 href="/login"
                 delay={0.4}
@@ -109,6 +121,26 @@ export default function Home() {
 
 function RoleCard({ title, desc, icon, color, href, delay }: any) {
   const isEmerald = color === 'emerald';
+  const isRose = color === 'rose';
+
+  const gradientClasses = isEmerald
+    ? 'from-emerald-500 to-teal-600'
+    : isRose
+    ? 'from-rose-600 to-red-600'
+    : 'from-blue-600 to-indigo-600';
+
+  const textClasses = isEmerald
+    ? 'text-emerald-400 group-hover:text-emerald-300'
+    : isRose
+    ? 'text-rose-400 group-hover:text-rose-300'
+    : 'text-blue-500 group-hover:text-blue-400';
+
+  const borderHoverClass = isEmerald
+    ? 'group-hover:border-emerald-500/50'
+    : isRose
+    ? 'group-hover:border-rose-500/60'
+    : 'group-hover:border-blue-500/50';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -116,15 +148,15 @@ function RoleCard({ title, desc, icon, color, href, delay }: any) {
       transition={{ delay, duration: 1, ease: [0.16, 1, 0.3, 1] }}
     >
       <Link href={href} className="block group h-full">
-        <div className={`relative h-full glass p-10 rounded-[2.5rem] border-white/5 group-hover:border-${color}-500/50 transition-all duration-700 overflow-hidden`}>
-           <div className={`absolute -inset-0.5 bg-gradient-to-br ${isEmerald ? 'from-emerald-500 to-teal-600' : 'from-blue-600 to-indigo-600'} rounded-[2.5rem] opacity-0 group-hover:opacity-10 blur-xl transition duration-700`} />
+        <div className={`relative h-full glass p-8 rounded-[2.5rem] border border-white/5 ${borderHoverClass} transition-all duration-700 overflow-hidden flex flex-col justify-between`}>
+           <div className={`absolute -inset-0.5 bg-gradient-to-br ${gradientClasses} rounded-[2.5rem] opacity-0 group-hover:opacity-15 blur-xl transition duration-700`} />
            
            <div className="relative z-10 flex flex-col h-full">
-              <div className={`${isEmerald ? 'text-emerald-400 group-hover:text-emerald-300' : 'text-blue-500 group-hover:text-blue-400'} mb-8 transition-colors`}>
+              <div className={`${textClasses} mb-6 transition-colors`}>
                 {icon}
               </div>
-              <h2 className="text-3xl font-black text-white mb-4 tracking-tight">{title}</h2>
-              <p className="text-slate-400 text-sm leading-relaxed mb-auto">{desc}</p>
+              <h2 className="text-2xl font-black text-white mb-3 tracking-tight">{title}</h2>
+              <p className="text-slate-400 text-xs sm:text-sm leading-relaxed mb-auto">{desc}</p>
               
               <div className="mt-8 flex items-center font-black uppercase tracking-widest text-[10px] text-white">
                 Enter Interface <ArrowRight size={14} className="ml-2 group-hover:translate-x-2 transition-transform" />
