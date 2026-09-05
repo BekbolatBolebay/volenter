@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PortalNav } from "@/components/portal/PortalNav";
+import Link from "next/link";
 import { 
   LayoutDashboard, 
   MapPin, 
@@ -14,7 +14,8 @@ import {
   PhoneCall, 
   Filter, 
   User, 
-  AlertTriangle 
+  AlertTriangle,
+  Home
 } from "lucide-react";
 import { useDispatchStore, CareType, RequestStatus } from "@/lib/dispatch-store";
 import { MedicalMap } from "@/components/medical/MedicalMap";
@@ -38,7 +39,29 @@ export default function DispatchPortalPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-slate-100 flex flex-col font-sans">
-      <PortalNav />
+      {/* Isolated Dispatch Header */}
+      <header className="sticky top-0 z-30 bg-[#0c0c14]/90 backdrop-blur-xl border-b border-zinc-800/80 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="w-9 h-9 rounded-xl bg-amber-600/20 text-amber-400 border border-amber-500/30 flex items-center justify-center hover:scale-105 transition-transform" title="Басты бетке оралу">
+              <Home className="w-4 h-4" />
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-black text-white">Координация және Диспетчер Орталығы</h1>
+                <span className="px-2 py-0.2 rounded-full text-[9px] font-extrabold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  Dispatcher Hub
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400">Қала бойынша мониторинг және жедел үлестіру</p>
+            </div>
+          </div>
+
+          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+            🟢 Жүйе онлайн
+          </span>
+        </div>
+      </header>
 
       {/* Header */}
       <div className="border-b border-zinc-800/80 bg-zinc-900/40 py-6 px-4">
