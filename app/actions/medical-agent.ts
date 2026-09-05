@@ -2,6 +2,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { EMERGENCY_FIRST_AID_GUIDES, FirstAidStep } from "@/lib/medical-data";
+import { CareType } from "@/lib/dispatch-store";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const ALEM_API_KEY = process.env.ALEM_API_KEY || "";
@@ -14,6 +15,8 @@ export interface TriageResult {
   urgencyLabel: string;
   isEmergency103Required: boolean;
   emergencyConditionType?: 'HEART_ATTACK' | 'STROKE' | 'BLEEDING' | 'DEFAULT';
+  careType: CareType;
+  careTypeLabel: string;
   detectedSymptoms: string[];
   recommendedSpecialties: ('cardiologist' | 'therapist' | 'neurologist' | 'pediatrician' | 'traumatologist' | 'pulmonologist' | 'general')[];
   specialistTitleKazakh: string;
@@ -23,7 +26,7 @@ export interface TriageResult {
 }
 
 /**
- * Server action to evaluate medical symptoms using Gemini 1.5 Flash
+ * Server action to evaluate medical & home care symptoms using Gemini 1.5 Flash
  */
 export async function evaluateMedicalTriage(
   userQuery: string,
@@ -31,11 +34,17 @@ export async function evaluateMedicalTriage(
 ): Promise<{ success: boolean; data: TriageResult }> {
   const defaultDisclaimer = "Ескерту: Бұл ақпарат тек алдын ала бағдарлауға арналған және ресми медициналық диагноз болып табылмайды. Төтенше жағдайда кідірместен 103 нөміріне хабарласыңыз.";
 
-  // Fast-track rule-based emergency detection for safety
+  // Fast-track rule-based detection for safety & specialist matching
   const queryLower = userQuery.toLowerCase();
   const isSevereChestPain = queryLower.includes("жүрек") && (queryLower.includes("қысып") || queryLower.includes("ауырып") || queryLower.includes("сол қол") || queryLower.includes("тыныс"));
   const isStrokeSigns = (queryLower.includes("инсульт") || queryLower.includes("бетім қисай") || queryLower.includes("сөйлей алмай") || queryLower.includes("қолым көтерілмей"));
   const isSevereBleeding = (queryLower.includes("қан тоқтамай") || queryLower.includes("қан ағып") || queryLower.includes("жарақат"));
+  
+  // Nurse detection
+  const isNurseNeed = queryLower.includes("капельница") || queryLower.includes("укол") || queryLower.includes("инъекция") || queryLower.includes("жара") || queryLower.includes("перевязка") || queryLower.includes("таңу") || queryLower.includes("инсулин");
+
+  // Psychologist detection
+  const isPsychNeed = queryLower.includes("психолог") || queryLower.includes("стресс") || queryLower.includes("депрессия") || queryLower.includes("үрей") || queryLower.includes("паника") || queryLower.includes("қорқыныш") || queryLower.includes("жүйке") || queryLower.includes("шаршадым") || queryLower.includes("бағып жүріп");
 
   if (!GEMINI_API_KEY && !ALEM_API_KEY) {
     // Intelligent offline fallback
@@ -47,10 +56,12 @@ export async function evaluateMedicalTriage(
           urgencyLabel: "Өте қауіпті (Шұғыл 103 қажет)",
           isEmergency103Required: true,
           emergencyConditionType: "HEART_ATTACK",
+          careType: "emergency",
+          careTypeLabel: "🚨 103 Жедел жәрдем шақыру",
           detectedSymptoms: ["Кеуде қысылуы", "Жүрек ауруы"],
           recommendedSpecialties: ["cardiologist"],
           specialistTitleKazakh: "Шұғыл кардиолог / Жедел жәрдем тобы",
-          responseMessage: "⚠️ НАЗАР АУДАРЫҢЫЗ! Кеуденің қатты қысылуы немесе жүрек тұсының ауыруы жүрек-қан тамырларының шұғыл жағдайын (инфаркт қаупін) көрсетуі мүмкін. Дереу 103 Жедел жәрдем шақырыңыз!",
+          responseMessage: "⚠️ НАЗАР АУДАРЫҢЫЗ! Кеуденің қатты қысылуы немесе жүрек тұсының ауыруы инфаркт қаупін білдіруі мүмкін. Дереу 103 Жедел жәрдем шақырыңыз!",
           firstAidAdvice: EMERGENCY_FIRST_AID_GUIDES.HEART_ATTACK,
           disclaimer: defaultDisclaimer
         }
@@ -65,45 +76,69 @@ export async function evaluateMedicalTriage(
           urgencyLabel: "Өте қауіпті (Инсульт қаупі - 103)",
           isEmergency103Required: true,
           emergencyConditionType: "STROKE",
+          careType: "emergency",
+          careTypeLabel: "🚨 103 Жедел жәрдем шақыру",
           detectedSymptoms: ["Бет қисаюы", "Сөйлеудің бұзылуы", "Қол әлсіздігі"],
           recommendedSpecialties: ["neurologist"],
           specialistTitleKazakh: "Шұғыл невролог / Реанимациялық 103",
-          responseMessage: "🚨 ДЕРЕУ 103 ШАҚЫРЫҢЫЗ! Сипатталған белгілер жедел ми қан айналымының бұзылуын (инсульт) білдіреді. Науқасқа дереу жедел жәрдем қажет!",
+          responseMessage: "🚨 ДЕРЕУ 103 ШАҚЫРЫҢЫЗ! Сипатталған белгілер жедел ми қан айналымының бұзылуын (инсульт) білдіреді.",
           firstAidAdvice: EMERGENCY_FIRST_AID_GUIDES.STROKE,
           disclaimer: defaultDisclaimer
         }
       };
     }
 
-    if (isSevereBleeding) {
+    if (isNurseNeed) {
       return {
         success: true,
         data: {
-          urgency: "CRITICAL_RED",
-          urgencyLabel: "Шұғыл көмек қажет (103)",
-          isEmergency103Required: true,
-          emergencyConditionType: "BLEEDING",
-          detectedSymptoms: ["Қан кету", "Ауыр жарақат"],
-          recommendedSpecialties: ["traumatologist"],
-          specialistTitleKazakh: "Травматолог-хирург",
-          responseMessage: "Қан кетуді шұғыл тоқтату қажет. Таза шүберекпен басып, дереу 103 нөміріне қоңырау шалыңыз.",
-          firstAidAdvice: EMERGENCY_FIRST_AID_GUIDES.BLEEDING,
+          urgency: "NON_URGENT_GREEN",
+          urgencyLabel: "Патронаждық көмек",
+          isEmergency103Required: false,
+          careType: "nurse",
+          careTypeLabel: "💉 Медбике қызметі (Үйге шақыру)",
+          detectedSymptoms: ["Процедуралық қажеттілік"],
+          recommendedSpecialties: ["general"],
+          specialistTitleKazakh: "Үйге баратын білікті медбике",
+          responseMessage: "Сіздің сұранысыңыз бойынша дәрігердің тағайындауымен капельница қою, инъекция жасау немесе жара таңу үшін білікті медбике шақыру рәсімдеуге болады.",
+          firstAidAdvice: EMERGENCY_FIRST_AID_GUIDES.DEFAULT,
           disclaimer: defaultDisclaimer
         }
       };
     }
 
-    // Standard fallback
+    if (isPsychNeed) {
+      return {
+        success: true,
+        data: {
+          urgency: "NON_URGENT_GREEN",
+          urgencyLabel: "Психологиялық қолдау",
+          isEmergency103Required: false,
+          careType: "psychologist",
+          careTypeLabel: "🧠 Психолог кеңесі",
+          detectedSymptoms: ["Эмоционалдық күйзеліс", "Үрей / Шаршау"],
+          recommendedSpecialties: ["general"],
+          specialistTitleKazakh: "Клиникалық & Кризистік психолог",
+          responseMessage: "Үйдегі науқасқа күтім жасау немесе созылмалы ауру жағдайы адамның психоэмоционалдық денсаулығына ауыр салмақ түсіреді. Сізге білікті психологтың жедел кеңесі немесе үйге келу сессиясы ұсынылады.",
+          firstAidAdvice: EMERGENCY_FIRST_AID_GUIDES.DEFAULT,
+          disclaimer: defaultDisclaimer
+        }
+      };
+    }
+
+    // Default Doctor Visit
     return {
       success: true,
       data: {
-        urgency: "NON_URGENT_GREEN",
-        urgencyLabel: "Жоспарлы қаралу (Төтенше қауіп жоқ)",
+        urgency: "URGENT_YELLOW",
+        urgencyLabel: "Дәрігердің қарауы қажет",
         isEmergency103Required: false,
+        careType: "doctor",
+        careTypeLabel: "🩺 Дәрігерді үйге шақыру",
         detectedSymptoms: ["Жалпы шағымдар"],
         recommendedSpecialties: ["therapist"],
-        specialistTitleKazakh: "Жалпы тәжірибелік дәрігер (Терапевт)",
-        responseMessage: "Шағымдарыңызға сәйкес, жағдайыңызды нақтылау үшін ең алдымен білікті терапевтке немесе отбасылық дәрігерге қаралғаныңыз жөн. Төмендегі картадан жақын орналасқан дәрігерлерді көре аласыз.",
+        specialistTitleKazakh: "Терапевт / Жалпы тәжірибелік дәрігер",
+        responseMessage: "Үйдегі науқастың жағдайын толық бағалау және ем тағайындау үшін білікті дәрігерді үйге шақыру ұсынылады. Біздің жүйе арқылы дәрігер үйге келіп, науқасты тексереді.",
         firstAidAdvice: EMERGENCY_FIRST_AID_GUIDES.DEFAULT,
         disclaimer: defaultDisclaimer
       }
@@ -115,24 +150,33 @@ export async function evaluateMedicalTriage(
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const systemPrompt = `
-You are a Medical Triage & Patient Safety AI Dispatcher for a healthcare platform.
-Your goal is to evaluate patient symptoms, determine urgency level, identify red flags for immediate emergency 103 (Ambulance), advise recommended medical doctor specialties, and provide reassuring first aid instructions in Kazakh.
+You are a MedTech HomeCare & Triage AI Dispatcher.
+You serve patients, bedridden patients, and family caregivers needing home medical assistance.
 
-CRITICAL SAFETY PROTOCOL:
-- If symptoms indicate life threats (e.g. acute chest pressure radiating to arm/jaw, FAST stroke signs like facial droop or slurred speech, massive bleeding, severe choking, acute anaphylaxis, loss of consciousness), MUST assign urgency: "CRITICAL_RED" and isEmergency103Required: true.
-- If symptoms are severe but not immediately fatal (fever >39C, severe abdominal pain, possible bone fracture): "URGENT_YELLOW" and isEmergency103Required: false.
-- If mild/routine (cold, minor headache, seasonal rash): "NON_URGENT_GREEN" and isEmergency103Required: false.
+Classify the user's situation into:
+1. careType:
+   - "emergency": life threats (chest pressure, stroke signs, massive bleeding, asphyxia) -> 103
+   - "doctor": needs medical diagnosis, exam, prescription at home (therapist, cardiologist, pediatrician, etc.)
+   - "nurse": needs medical procedures at home (IV drip, intramuscular/intravenous injections, surgical dressing, catheter care, vital check)
+   - "psychologist": emotional distress, panic attack, anxiety, depression, or caregiver burnout (family caring for severe patient)
 
-Return ONLY a valid JSON with this structure:
+2. urgency:
+   - "CRITICAL_RED": immediate 103 call
+   - "URGENT_YELLOW": acute discomfort, needs same-day visit
+   - "NON_URGENT_GREEN": routine procedure, scheduled therapy, nurse care
+
+Return ONLY a valid JSON:
 {
   "urgency": "CRITICAL_RED" | "URGENT_YELLOW" | "NON_URGENT_GREEN",
-  "urgencyLabel": "Қазақша қысқа сипаттама (мысалы: 'Өте қауіпті (Шұғыл 103 қажет)')",
+  "urgencyLabel": "Қазақша қысқа сипаттама",
   "isEmergency103Required": boolean,
   "emergencyConditionType": "HEART_ATTACK" | "STROKE" | "BLEEDING" | "DEFAULT",
+  "careType": "doctor" | "nurse" | "psychologist" | "emergency",
+  "careTypeLabel": "Қазақша атауы (мысалы: 'Дәрігерді үйге шақыру' немесе 'Медбике (капельница/укол)')",
   "detectedSymptoms": ["анықталған симптомдар қазақша"],
   "recommendedSpecialties": ["cardiologist" | "therapist" | "neurologist" | "pediatrician" | "traumatologist" | "pulmonologist" | "general"],
-  "specialistTitleKazakh": "Ұсынылатын дәрігер (мысалы: 'Кардиолог' немесе 'Терапевт')",
-  "responseMessage": "Жылы, кәсіби, түсінікті қазақ тіліндегі жауап пен кеңес",
+  "specialistTitleKazakh": "Ұсынылатын маман (мысалы: 'Терапевт-дәрігер' немесе 'Патронаждық медбике')",
+  "responseMessage": "Жылы, жанашыр, кәсіби қазақ тіліндегі жауап пен нақты нұсқау",
   "firstAidAdvice": [
     {
       "title": "Қадам атауы",
@@ -144,9 +188,9 @@ Return ONLY a valid JSON with this structure:
 `;
 
     const userPrompt = `
-Науқас шағымы: "${userQuery}"
+Науқас немесе туысының сұранысы: "${userQuery}"
 Диалог тарихы: ${JSON.stringify(chatHistory.slice(-4))}
-Жоғарыдағы талаптар бойынша JSON форматында ғана жауап беріңіз.
+Жоғарыдағы талап бойынша JSON түрінде ғана жауап беріңіз.
 `;
 
     const result = await model.generateContent([systemPrompt, userPrompt]);
@@ -162,22 +206,25 @@ Return ONLY a valid JSON with this structure:
       }
     };
   } catch (err) {
-    console.error("Gemini Medical Triage Error, using safe heuristics:", err);
-    // Safe heuristic fallback
+    console.error("Gemini Medical Triage Error, using heuristics:", err);
     const isRed = isSevereChestPain || isStrokeSigns || isSevereBleeding;
+    const careType: CareType = isRed ? "emergency" : isNurseNeed ? "nurse" : isPsychNeed ? "psychologist" : "doctor";
+
     return {
       success: true,
       data: {
         urgency: isRed ? "CRITICAL_RED" : "URGENT_YELLOW",
-        urgencyLabel: isRed ? "Шұғыл көмек (103)" : "Маман кеңесі қажет",
+        urgencyLabel: isRed ? "Шұғыл 103 қажет" : "Маманның үйге келуі қажет",
         isEmergency103Required: isRed,
         emergencyConditionType: isSevereChestPain ? "HEART_ATTACK" : isStrokeSigns ? "STROKE" : isSevereBleeding ? "BLEEDING" : "DEFAULT",
+        careType,
+        careTypeLabel: careType === "emergency" ? "🚨 103 Жедел жәрдем" : careType === "nurse" ? "💉 Медбике (укол/капельница)" : careType === "psychologist" ? "🧠 Психолог кеңесі" : "🩺 Дәрігерді үйге шақыру",
         detectedSymptoms: ["Шағым тіркелді"],
-        recommendedSpecialties: isSevereChestPain ? ["cardiologist"] : isStrokeSigns ? ["neurologist"] : ["therapist"],
-        specialistTitleKazakh: isSevereChestPain ? "Кардиолог" : isStrokeSigns ? "Невропатолог" : "Терапевт",
+        recommendedSpecialties: isSevereChestPain ? ["cardiologist"] : ["therapist"],
+        specialistTitleKazakh: isRed ? "Шұғыл дәрігер" : careType === "nurse" ? "Патронаждық медбике" : careType === "psychologist" ? "Клиникалық психолог" : "Терапевт",
         responseMessage: isRed
-          ? "🚨 НАЗАР АУДАРЫҢЫЗ! Жағдайыңыз шұғыл дәрігерлік көмекті талап етеді. Кідірместен 103 Жедел жәрдем шақырыңыз!"
-          : "Симптомдарыңызды мұқият тексеру үшін төменде көрсетілген мамандардың біріне қаралғаныңыз абзал.",
+          ? "🚨 НАЗАР АУДАРЫҢЫЗ! Бұл жағдайда кідірместен 103 Жедел жәрдем шақырылуы қажет!"
+          : "Сұранысыңыз жүйеде тіркелді. Төмендегі батырма арқылы үйге маман шақыртуды бірден рәсімдей аласыз.",
         firstAidAdvice: isSevereChestPain ? EMERGENCY_FIRST_AID_GUIDES.HEART_ATTACK : EMERGENCY_FIRST_AID_GUIDES.DEFAULT,
         disclaimer: defaultDisclaimer
       }
