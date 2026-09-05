@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { supabase } from './supabase';
 
 export type CareType = 'doctor' | 'nurse' | 'psychologist' | 'emergency';
 export type RequestStatus = 'pending' | 'accepted' | 'en_route' | 'completed' | 'cancelled';
@@ -32,6 +33,7 @@ export interface CareRequest {
 
 interface DispatchStoreState {
   requests: CareRequest[];
+  fetchFromSupabase: () => Promise<void>;
   createRequest: (request: Omit<CareRequest, 'id' | 'createdAt' | 'status'>) => CareRequest;
   acceptRequest: (requestId: string, specialist: { id: string; name: string; phone: string; role: string }) => void;
   updateStatus: (requestId: string, status: RequestStatus) => void;
@@ -93,26 +95,6 @@ export const INITIAL_MOCK_REQUESTS: CareRequest[] = [
     specialistRole: 'Кризистік психолог',
     notes: 'Сағат 15:00-де үйге бару сессиясы келісілді.',
     createdAt: 'Бүгін, 09:45'
-  },
-  {
-    id: 'req-104',
-    patientName: 'Ермекқызы Дана',
-    patientAge: 68,
-    phone: '+7 (708) 111-22-33',
-    address: 'Алматы қ., Жандосов көшесі, 22, 5-пәтер',
-    coordinates: [43.2280, 76.9180],
-    careType: 'nurse',
-    specialtyNeeded: 'Медбике',
-    symptoms: 'Күнделікті инсулин егу және қант деңгейін (глюкометрмен) өлшеу.',
-    urgency: 'NON_URGENT_GREEN',
-    status: 'completed',
-    assignedSpecialistId: 'nurse-2',
-    assignedSpecialistName: 'Меруерт Саматқызы',
-    assignedSpecialistPhone: '+7 (700) 444-55-66',
-    specialistRole: 'Жоғары санатты медбике',
-    notes: 'Қант деңгейі 6.2 ммоль/л. Процедура сәтті орындалды.',
-    vitalSigns: { bloodPressure: '125/80', temperature: '36.6°C', pulse: '74' },
-    createdAt: 'Бүгін, 08:30'
   }
 ];
 
@@ -121,6 +103,37 @@ export const useDispatchStore = create<DispatchStoreState>()(
     (set, get) => ({
       requests: INITIAL_MOCK_REQUESTS,
 
+      fetchFromSupabase: async () => {
+        try {
+          const { data, error } = await supabase.from('care_requests').select('*');
+          if (!error && data && data.length > 0) {
+            const mapped: CareRequest[] = data.map((r: any) => ({
+              id: r.id,
+              patientName: r.patient_name,
+              patientAge: r.patient_age,
+              phone: r.phone,
+              address: r.address,
+              coordinates: r.coordinates || [43.2389, 76.8897],
+              careType: r.care_type,
+              specialtyNeeded: r.specialty_needed,
+              symptoms: r.symptoms,
+              urgency: r.urgency,
+              status: r.status,
+              assignedSpecialistId: r.assigned_specialist_id,
+              assignedSpecialistName: r.assigned_specialist_name,
+              assignedSpecialistPhone: r.assigned_specialist_phone,
+              specialistRole: r.specialist_role,
+              notes: r.notes,
+              vitalSigns: r.vital_signs,
+              createdAt: r.created_at || 'Жаңа'
+            }));
+            set({ requests: mapped });
+          }
+        } catch (e) {
+          console.warn('Supabase fetch notice:', e);
+        }
+      },
+
       createRequest: (newReqData) => {
         const newReq: CareRequest = {
           ...newReqData,
@@ -128,9 +141,35 @@ export const useDispatchStore = create<DispatchStoreState>()(
           status: 'pending',
           createdAt: 'Жаңа ғана'
         };
+
+        // Update local state immediately
         set((state) => ({
           requests: [newReq, ...state.requests]
         }));
+
+        // Async sync with Supabase
+        try {
+          supabase.from('care_requests').insert([
+            {
+              id: newReq.id,
+              patient_name: newReq.patientName,
+              patient_age: newReq.patientAge,
+              phone: newReq.phone,
+              address: newReq.address,
+              coordinates: newReq.coordinates,
+              care_type: newReq.careType,
+              specialty_needed: newReq.specialtyNeeded,
+              symptoms: newReq.symptoms,
+              urgency: newReq.urgency,
+              status: newReq.status
+            }
+          ]).then((res) => {
+            if (res.error) console.warn('Supabase insert notice:', res.error.message);
+          });
+        } catch (err) {
+          console.warn('Supabase insert exception:', err);
+        }
+
         return newReq;
       },
 
@@ -150,6 +189,22 @@ export const useDispatchStore = create<DispatchStoreState>()(
               : r
           )
         }));
+
+        // Async sync with Supabase
+        try {
+          supabase.from('care_requests').update({
+            status: 'accepted',
+            assigned_specialist_id: specialist.id,
+            assigned_specialist_name: specialist.name,
+            assigned_specialist_phone: specialist.phone,
+            specialist_role: specialist.role,
+            notes: `${specialist.name} шақыртуды қабылдады.`
+          }).eq('id', requestId).then((res) => {
+            if (res.error) console.warn('Supabase update notice:', res.error.message);
+          });
+        } catch (err) {
+          console.warn('Supabase update exception:', err);
+        }
       },
 
       updateStatus: (requestId, status) => {
@@ -158,6 +213,15 @@ export const useDispatchStore = create<DispatchStoreState>()(
             r.id === requestId ? { ...r, status } : r
           )
         }));
+
+        // Async sync with Supabase
+        try {
+          supabase.from('care_requests').update({ status }).eq('id', requestId).then((res) => {
+            if (res.error) console.warn('Supabase status update notice:', res.error.message);
+          });
+        } catch (err) {
+          console.warn('Supabase status update exception:', err);
+        }
       },
 
       updateVitals: (requestId, vitals) => {
@@ -166,6 +230,15 @@ export const useDispatchStore = create<DispatchStoreState>()(
             r.id === requestId ? { ...r, vitalSigns: { ...r.vitalSigns, ...vitals } } : r
           )
         }));
+
+        // Async sync with Supabase
+        try {
+          supabase.from('care_requests').update({ vital_signs: vitals }).eq('id', requestId).then((res) => {
+            if (res.error) console.warn('Supabase vitals update notice:', res.error.message);
+          });
+        } catch (err) {
+          console.warn('Supabase vitals update exception:', err);
+        }
       },
 
       addDoctorNote: (requestId, note) => {
@@ -176,6 +249,17 @@ export const useDispatchStore = create<DispatchStoreState>()(
               : r
           )
         }));
+
+        try {
+          const req = get().requests.find((r) => r.id === requestId);
+          if (req) {
+            supabase.from('care_requests').update({ notes: req.notes }).eq('id', requestId).then((res) => {
+              if (res.error) console.warn('Supabase note update notice:', res.error.message);
+            });
+          }
+        } catch (err) {
+          console.warn('Supabase note update exception:', err);
+        }
       },
 
       resetToDefaults: () => {
