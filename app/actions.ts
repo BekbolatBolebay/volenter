@@ -4,8 +4,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Ensure API Keys are loaded from Environment Variables
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const ALEM_API_KEY = process.env.ALEM_API_KEY || "";
-const KAZLLM_URL = "https://llm.alem.ai/v1/chat/completions";
+const ALEM_API_KEY = process.env.ALEMLLM_API_KEY || process.env.ALEM_API_KEY || "";
+const KAZLLM_URL = process.env.ALEM_LLM_URL || "https://llm.alem.ai/v1/chat/completions";
 
 /**
  * AI Voice-to-Task Parsing
