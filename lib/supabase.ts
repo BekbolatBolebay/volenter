@@ -1,48 +1,12 @@
-// lib/supabase.ts
-// MOCKED VERSION FOR OFFLINE/LOCAL DEVELOPMENT
+import { createClient } from '@supabase/supabase-js';
 
-const createMockProxy = (data: any = null) => {
-  const handler = {
-    get: (target: any, prop: string): any => {
-      // Mock methods used in the app
-      if (['select', 'insert', 'update', 'delete', 'match', 'eq', 'single', 'order', 'limit'].includes(prop)) {
-        return () => createMockProxy(data);
-      }
-      
-      // Return the mock result
-      if (prop === 'then') {
-        return (resolve: any) => resolve({ data, error: null });
-      }
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://txeohywoansohvvdkrkc.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR4ZW9oeXdvYW5zb2h2dmRrcmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjI3MzAsImV4cCI6MjA3NTY5ODczMH0.OgCrrRaQ2aCj6ddQXmel0EJWI9JDsJQ1elMEKwrTPn8';
 
-      // Chainable
-      return createMockProxy(data);
-    }
-  };
-  return new Proxy({}, handler);
-};
-
-export const supabase = {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    signUp: async ({ email }: { email: string }) => ({
-      data: { user: { id: 'mock-user-id', email } },
-      error: null
-    }),
-    signInWithPassword: async ({ email }: { email: string }) => ({
-      data: { user: { id: 'mock-user-id', email } },
-      error: null
-    }),
-    signOut: async () => ({ error: null }),
-    getSession: async () => ({ data: { session: null }, error: null }),
-    onAuthStateChange: (cb: any) => {
-      return { data: { subscription: { unsubscribe: () => {} } } };
-    }
-  },
-  from: (table: string) => {
-    // If it's a select for specific tables, we could return mock data here
-    // But we'll handle actual data management in Zustand (store.ts)
-    return createMockProxy(null);
-  },
-  channel: () => createMockProxy(),
-  removeChannel: () => {},
-  removeAllChannels: () => {}
-};
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
